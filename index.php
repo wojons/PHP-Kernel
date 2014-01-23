@@ -21,10 +21,9 @@ class scheduler {
                 foreach($this->task_map as $map_id=>$map) {
                     //var_dump($map_id, $map);
                     if($this->map_counts[$map_id] > 0) foreach($map as $task_id=>&$task) {
-                        $retval = $task->run();
                         //var_dump($task);
-                        
-                        if(!empty($retval)) foreach($retval as $dat)   {
+                        $retval = $task->run();
+                        if(!empty($retval) && !is_bool($retval)) foreach($retval as $dat)   {
                             if ($dat instanceof systemCall) {
                                 $dat($task, $this);
                             }
@@ -204,15 +203,17 @@ class scheduler {
 
 class task {
     private $state;
-    private $pre_run  = array();
+    public $waitFor  = null;
     private $post_run = array();
     private $task_id  = null;
     private $finished = False;
     private $b4Yield  = True;
     private $incomingValue = null;
+    private $name = null;
     
-    function __construct(Generator $coroutine) {
+    function __construct(Generator $coroutine, $opt=null) {
         $this->coroutine = $coroutine;
+        $this->name = (isset($opt['name'])) ? $opt['name'] : null;
     }
     
     function setTaskId($id) {
@@ -238,27 +239,28 @@ class task {
     }
     
     function run() {
-        if(!empty($this->pre_run)) {
-            foreach($this->pre_run as $dex=>$dat) {
-                if(!$dat) {
-                    return $this;
-                }
-            }
+        if(isset($this->waitFor) && is_callable($this->waitFor) && $this->waitFor() == False) {
+            print "NULL".PHP_EOL;
+            return Null;
         }
         
         if ($this->b4Yield) {
             $this->b4Yield = false;
-            return $this->coroutine->current();
+            $this->coroutine->current();
+            $this->coroutine->send($this);
+            return True;
         } else {
             $retval = $this->coroutine->send($this->receiveValue());
             return $retval;
         }
         
-        if(!empty($this->post_run)) {
+        /* some sort of do after the corunitne runs thingy
+         * if(!empty($this->)) {
             foreach($this->post_run as $dex=>$dat) {
                 $dat();
             }
         }
+        */
     }
     
     function bypassRun($send) {
@@ -303,6 +305,115 @@ class systemCall {
     }
 }
 
+class corutineReturnValue {
+    protected $value;
+    
+    public function __construct($value) {
+        $this->value = $value;
+    }
+    
+    public function getValue() {
+        return $this->value;
+    }
+}
+
+class coStream {
+    protected $stream;
+    
+    function mkStreamAsync($timeout=0) {
+        stream_set_blocking($this->stream, 0);
+        stream_set_timeout($this->stream, $timeout);
+    }
+    
+    function waitForRead() {
+        $stream = array($this->stream);
+        $write  = Null;
+        $except = Null;
+        if(stream_select($stream, $write, $except, 0) > 0) {
+            return True;
+        }
+        return False;
+    }
+    
+    function waitForWrite() {
+        $stream = array($this->stream);
+        $read   = Null;
+        $except = Null;
+        if(stream_select($read, $stream, $except, 0) > 0) {
+            return True;
+        }
+        return False;
+    }
+}
+
+class coStreamSocketServer extends coStream {
+    
+    function __construct($socket, $timeout=0) {
+        $error = array('errno' => null, 'errstr' => null);
+        $this->stream = stream_socket_server("tcp://0.0.0.0:9898", $error['errno'], $error['errstr']);
+        //var_dump($this->stream)."co".PHP_EOL;
+        stream_set_blocking($this->stream, 0);
+        stream_set_timeout($this->stream, $timeout);
+    }
+    
+    /*function accept() {
+        while (true) {
+            $this->task->waitFor = $this->waitforRead();
+            yield;
+            return stream_socket_accept($this->stream, 0);
+        }
+    }*/
+}
+
+class pingServer extends coStreamSocketServer {
+    function __construct() {
+        parent::__construct("tcp://0.0.0.0:9898");
+    }
+    
+    function run() {
+        $this->task = yield;
+        while (true) {
+            //var_dump($this->stream);
+            $this->task->waitFor = $this->waitforRead();
+            yield;
+            if($conn = @stream_socket_accept($this->stream, 0)) {
+                yield array(new task((new pingHandle($conn))->run(), array('name' => 'pingHandle')));
+                $conn = null;
+            }
+        }
+    }
+}
+
+class pingHandle extends coStream {
+    function __construct($conn) {
+        $this->stream = $conn;
+        $this->mkStreamAsync();
+    }
+    
+    function run() {
+        $this->task = yield;
+        while (true) {
+            $this->task->waitFor = $this->waitForRead();
+            yield;
+            $new = fread($this->stream, 1024);
+            if(!empty($new)) {
+                $payload .= $new;
+            } 
+            elseif(!empty($payload)) {
+                print $payload;
+                $this->task->waitFor = $this->waitForWrite();
+                yield;
+                fwrite($this->stream, 'ping: "'.substr($payload, 0, -1).'"'.PHP_EOL);
+                $payload = null;
+            }
+        }
+    }
+}
+
+function retval ($value) {
+    return new corutineReturnValue($value);
+}
+
 $kernel = new scheduler();
 function task1() {
     for ($i = 1; $i <= 10; ++$i) {
@@ -324,9 +435,20 @@ $me = function () {
     }
 };
 
-$kernel->addTask(task1(), 1);
+$me2 = function() {
+    $task = yield;
+    print "ff".PHP_EOL;
+    var_dump($task);
+    $a = null;
+    (new pingServer($task));
+    print "fff";
+};
+
+/*$kernel->addTask(task1(), 1);
 $kernel->addTask(task2(), 5);
-$kernel->addTask($me(), 10);
+$kernel->addTask($me(), 10);*/
+$test = (new pingServer())->run();
+$kernel->addTask($test, 1, array('name' => 'pingServer'));
 
 $kernel->run(11);
 ?>
