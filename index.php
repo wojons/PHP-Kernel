@@ -329,7 +329,8 @@ class coStream {
         $stream = array($this->stream);
         $write  = Null;
         $except = Null;
-        if(stream_select($stream, $write, $except, 0) > 0) {
+        //print "waiting";
+        if(stream_select($stream, $write, $except, 0, 0) > 0) {
             return True;
         }
         return False;
@@ -392,6 +393,7 @@ class pingHandle extends coStream {
     
     function run() {
         $this->task = yield;
+        $payload = "";
         while (true) {
             $this->task->waitFor = $this->waitForRead();
             yield;
