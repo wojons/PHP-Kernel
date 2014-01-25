@@ -1,19 +1,22 @@
 <?php
 
 class task {
+    
+    public $waitFor    = null;
+    public $proxyValue = array();
+    public $super      = array();
+    
     private $state;
-    public $waitFor  = null;
     private $post_run = array();
     private $task_id  = null;
     private $finished = False;
     private $b4Yield  = True;
     private $incomingValue = array();
-    public $proxyValue = array();
     private $name = null;
     private $ptid = null; //parent task id
     
-    function __construct(Generator $coroutine, $opt=null) {
-        $this->coroutine = $coroutine;
+    function __construct($opt=null, callable $script) {
+        $this->script = $script;
         $this->name = (isset($opt['name'])) ? $opt['name'] : null;
     }
     
@@ -76,14 +79,35 @@ class task {
         return $v;
     }
     
+    public function setRetval($val) {
+        $this->retval[] = $val;
+    }
+    
+    private function getRetval() {
+        if(!empty($this->retval)) {
+            $r = $this->retval;
+            $this->retval = null;
+            return $r;
+        }
+        return null;
+    }
+    
     function run() {
-        //var_dump($this->waitFor, is_callable($this->waitFor), $this->waitFor);
-        if(isset($this->waitFor) && is_callable($this->waitFor) && $this->waitFor() == False) {
-            print "NULL".PHP_EOL;
-            return Null;
+        if(!empty($this->events)) {
+            foreach($this->events as $eId => $event ) {
+                $event->run();
+                
+                if(!$event->isVaild()) {
+                    unset($this->events[$eId]);
+                }
+            }
         }
         
-        if ($this->b4Yield) {
+        $this->script->__invoke($this);
+        return $this->getRetval();
+        
+        
+        /*if ($this->b4Yield) {
             $this->b4Yield = false;
             $this->coroutine->current();
             $this->coroutine->send($this);
@@ -91,15 +115,8 @@ class task {
         } else {
             $retval = $this->coroutine->send($this->receiveValue());
             return $retval;
-        }
+        }*/
         
-        /* some sort of do after the corunitne runs thingy
-         * if(!empty($this->)) {
-            foreach($this->post_run as $dex=>$dat) {
-                $dat();
-            }
-        }
-        */
     }
     
     function bypassRun($send) {
@@ -107,7 +124,7 @@ class task {
     }
     
     function isFinished()   {
-        if($this->finished == True || !$this->coroutine->valid() == True) {
+        if($this->finished == True) {
             return True;
         }
         return False;
@@ -127,22 +144,6 @@ class task {
     
     function __invoke() {
         return $this->run();
-    }
-    
-    function addEvent($test, $cb) {
-        $this->events[] = array('check' => $check, 'callback' => $callback);
-    }
-    
-    function rmEvent($id) {
-        unset($this->events[$id]);
-    }
-    
-    function processEvents() {
-        foreach($this->events as $dex=>&$dat) {
-            if($dat['check']() == True) {
-                $dat['callback']();
-            }
-        }
     }
     
 }

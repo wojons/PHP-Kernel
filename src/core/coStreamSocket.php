@@ -3,12 +3,22 @@
 class coStreamSocket {
     protected $stream;
     
+    function __construct($stream=null) {
+        if(is_resource($stream)) {
+            $this->stream = $stream;
+        }
+    }
+    
     function mkStreamAsync($timeout=0) {
         stream_set_blocking($this->stream, 0);
         stream_set_timeout($this->stream, $timeout);
     }
     
-    function waitForRead() {
+    function &getStream() {
+        return $this->stream;
+    }
+    
+    function canRead() {
         $stream = array($this->stream);
         $write  = Null;
         $except = Null;
@@ -19,7 +29,7 @@ class coStreamSocket {
         return False;
     }
     
-    function waitForWrite() {
+    function canWrite() {
         $stream = array($this->stream);
         $read   = Null;
         $except = Null;

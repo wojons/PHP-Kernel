@@ -37,7 +37,7 @@ class scheduler {
                                 $dat($task, $this);
                             }
                             elseif($dat instanceof task) {
-                                $task_id = $this->addTask($dat);
+                                $task_id = $this->addTask(array(), $dat);
                                 $this->__setTaskParentId($task->getTaskId(), $task_id);
                             }
                             elseif($dat instanceof coProxyValue) {
@@ -78,12 +78,14 @@ class scheduler {
         return True;
     }
     
-    function addTask($cb, $priority=1, $opt=null) {
+    function addTask($opt, $cb) {
         if ($cb instanceof task) {
             $this->tasks[] =& $cb;
         } else {
-            $this->tasks[] = new task($cb, $opt);
+            $this->tasks[] = new task($opt, $cb);
         }
+        
+        $priority = isset($opt['priority']) ? $opt['priority'] : 1;
         
         end($this->tasks);
         $task_id = key($this->tasks);
