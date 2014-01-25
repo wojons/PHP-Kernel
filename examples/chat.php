@@ -2,11 +2,8 @@
 
 require_once('../src/core/schedular.php');
 require_once('../src/core/coStreamSocketServer.php');
-require_once('../src/core/event.php');
 
 $kernel = new scheduler();
-//$test = (new chatServer())->run();
-
 $kernel->addTask(array('name' => 'chatServer'), function(&$that) {
     if(!isset($that->super['server'])) {
         $that->super['server'] = new coStreamSocketServer('tcp://0.0.0.0:9191');
@@ -30,7 +27,6 @@ $kernel->addTask(array('name' => 'chatServer'), function(&$that) {
                 $msg = $that->super['name'].': "'.rtrim($that->super['typing']).'"'.PHP_EOL;
                 $that->setRetval((new coProxyValue($msg))->setType('byParentId'));
                 $that->super['typing'] = "";
-                
                 print $msg;
             } 
             

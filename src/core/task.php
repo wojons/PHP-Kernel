@@ -1,5 +1,7 @@
 <?php
 
+require_once(dirname(__FILE__).'/event.php');
+
 class task {
     
     public $waitFor    = null;
