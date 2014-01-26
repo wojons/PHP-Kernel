@@ -11,14 +11,6 @@ class coStreamSocketServer extends coStreamSocket {
         stream_set_blocking($this->stream, 0);
         stream_set_timeout($this->stream, $timeout);
     }
-    
-    /*function accept() {
-        while (true) {
-            $this->task->waitFor = $this->waitforRead();
-            yield;
-            return stream_socket_accept($this->stream, 0);
-        }
-    }*/
 }
 
 ?>

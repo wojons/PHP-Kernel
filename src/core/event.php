@@ -4,21 +4,41 @@ class event {
     
     public $event;
     public $check = null;
+    public $data  = null;
+    
     public $vaild = True;
     public $name  = "";
     
-    function __construct($event, $data=null, &$task, $check=null) {
-        $this->event = $event;
-        $this->task  = $task;
-        $this->data  = $data;
+    function __construct(&$task, $data, $event=null, $check=null) {
+        $this->task  =& $task;
         
-        if ($check == null) {
+        if(is_callable($data) && is_null($event) && is_null($check)) {
+            $this->event = $data;
+        }
+        elseif((is_callable($data) || $data instanceof Generator) && is_callable($event) && is_null($check)) {
+            $this->event = $data;
+            $this->check = $event;
+        }
+        elseif((!is_callable($data) || !$data instanceof Generator) && is_callable($event)) {
+            $this->data  = $data;
+            $this->event = $event;
+        }
+        elseif(!is_callable($data) && is_callable($event) && is_callable($check)) {
+            $this->data  = $data;
+            $this->event = $event;
             $this->check = $check;
         }
+        //print "a9"; var_dump(array($task, $data, $event, $check));
     }
     
-    function isVaild() {
-        if (!$this->vaild || !$this->event->vaild()) {
+    function getPending($del=false) {
+        $pending = $this->pending;
+        $this->pending = array();
+        return $pending;
+    }
+    
+    function isValid() {
+        if (!$this->vaild || !$this->event->valid()) {
             "not vaild";
             return False;
         }
@@ -33,8 +53,15 @@ class event {
             $retval = $this->event->__invoke($this->task, $this->data);
             $this->vaild = False;
             return $retval;
+        } elseif($this->event instanceof Generator) {
+            if(empty($this->pending)) {
+                return $this->event->next();
+            }
+            return $this->event->send($this->getPending(True));
         }
-        return $this->event-send();
+        print "fff";
+        return False;
+    
     }
 }
 

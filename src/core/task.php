@@ -99,7 +99,7 @@ class task {
             foreach($this->events as $eId => $event ) {
                 $event->run();
                 
-                if(!$event->isVaild()) {
+                if(!$event->isValid()) {
                     unset($this->events[$eId]);
                 }
             }
@@ -119,6 +119,15 @@ class task {
             return $retval;
         }*/
         
+    }
+    
+    function addEvent(event $event) {
+        $this->events[] = $event;
+        return True;
+    }
+    
+    function delEvent($id) {
+        unset($this->events[$id]);
     }
     
     function bypassRun($send) {

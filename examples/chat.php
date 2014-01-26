@@ -33,10 +33,13 @@ $kernel->addTask(array('name' => 'chatServer'), function(&$that) {
             //setup events to write messages to this user
             if(!empty($that->proxyValueIsSet())) {
                 foreach($that->getProxyValue(true) as $proxy) {
-                    $that->events[] = (new event(function(&$that, $data){
+                    $that->events[] = ( new event($that, $proxy,
+                    function(&$that, $data){
                         fwrite($that->super['conn']->getStream(), $data->value);
-                    }
-                    , $proxy, $that, $that->super['conn']->canWrite()));
+                    }, 
+                    function() {
+                        return $that->super['conn']->canWrite();
+                    }));
                 }
             }
         });
@@ -44,7 +47,6 @@ $kernel->addTask(array('name' => 'chatServer'), function(&$that) {
         $handler->super['conn'] = $conn;
         $that->setRetval($handler);
     }
-    
 });
 
 $kernel->run(11);
