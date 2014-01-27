@@ -19,7 +19,7 @@ class event {
             $this->event = $data;
             $this->check = $event;
         }
-        elseif((!is_callable($data) || !$data instanceof Generator) && is_callable($event)) {
+        elseif((!is_callable($data) || !$data instanceof Generator) && (is_callable($event) || $event instanceof Generator)) {
             $this->data  = $data;
             $this->event = $event;
         }
@@ -38,7 +38,7 @@ class event {
     }
     
     function isValid() {
-        if (!$this->vaild || !$this->event->valid()) {
+        if (!$this->vaild || ($this->event instanceof Generator && !$this->event->valid())) {
             "not vaild";
             return False;
         }
@@ -46,20 +46,23 @@ class event {
     }
     
     function run() {
-        if(!is_null($this->check) && $this->check == False) {
+        if(!is_null($this->check) && $this->check->__invoke() == False) {
             return False;
         }
+        
         if(is_callable($this->event)) {
             $retval = $this->event->__invoke($this->task, $this->data);
             $this->vaild = False;
             return $retval;
+            
         } elseif($this->event instanceof Generator) {
             if(empty($this->pending)) {
                 return $this->event->next();
             }
             return $this->event->send($this->getPending(True));
         }
-        print "fff";
+        
+        print "req run fail".PHP_EOL;
         return False;
     
     }

@@ -141,6 +141,14 @@ class task {
         return False;
     }
     
+    function setFinshed($state) {
+        if (is_bool($state)) {
+            $this->finished = $state;
+            return True;
+        }
+        return False;
+    }
+    
     function __processReturn($re) {
         foreach($re as $dex=>$dat) {
             if($dat instanceof task) {

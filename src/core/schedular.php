@@ -230,8 +230,8 @@ class scheduler {
     }
     
     private function __unsetTaskParentId($task_id) {
-        unset($this->task_ptid[$parent_id][$task_id]);
-        $this->tasks[$this->tasks->getParentId()][$task_id]->setParentTaskId(null);
+        unset($this->task_ptid[$this->tasks[$task_id]->getParentId()][$task_id]);
+        $this->tasks[$task_id]->setParentId(null);
     }
     
     /* will proxy data via the ptid */
