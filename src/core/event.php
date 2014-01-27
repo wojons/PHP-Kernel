@@ -67,6 +67,11 @@ class event {
         return Null;
     
     }
+    
+    function __delSelf() {
+        unset($this->task);
+        
+    }
 }
 
 ?>

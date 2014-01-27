@@ -47,7 +47,8 @@ class scheduler {
                         unset($retval);
                         
                         if ($task->isFinished()) {
-                           $this->delTask($task_id);
+                            $this->tasks[$task_id]->__delSelf();
+                            $this->delTask($task_id);
                         }
                         
                         /*if(mt_rand(1, 1000) == 1) {

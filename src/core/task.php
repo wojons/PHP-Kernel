@@ -172,6 +172,13 @@ class task {
         return $this->run();
     }
     
+    function __delSelf() {
+        if(!empty($this->events)) foreach($this->events as $dex=>$dat) {
+            $dat->__delSelf();
+            unset($this->events[$dex]);
+        }
+    }
+    
 }
 
 ?>
