@@ -69,8 +69,7 @@ class event {
     }
     
     function __delSelf() {
-        unset($this->task);
-        
+        unset($this->task, $this->event, $this->check, $this->data);
     }
 }
 
