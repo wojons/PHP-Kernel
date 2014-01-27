@@ -12,7 +12,7 @@ class event {
     function __construct(&$task, $data, $event=null, $check=null) {
         $this->task  =& $task;
         
-        if(is_callable($data) && is_null($event) && is_null($check)) {
+        if((is_callable($data) || $data instanceof Generator)&& is_null($event) && is_null($check)) {
             $this->event = $data;
         }
         elseif((is_callable($data) || $data instanceof Generator) && is_callable($event) && is_null($check)) {
@@ -62,8 +62,9 @@ class event {
             return $this->event->send($this->getPending(True));
         }
         
-        print "req run fail".PHP_EOL;
-        return False;
+        print "req run fail: ".$this->name.PHP_EOL;
+        var_dump($this->event);
+        return Null;
     
     }
 }

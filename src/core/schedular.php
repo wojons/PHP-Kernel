@@ -1,15 +1,16 @@
 <?php
 
+//xdebug_start_trace('/tmp/trace/'.time());
+
+
 require_once(dirname(__FILE__).'/task.php');
 require_once(dirname(__FILE__).'/corutineReturnValue.php');
 require_once(dirname(__FILE__).'/util.php');
 
-
-
 class scheduler {
     
-    private $max_tasks_per_map = 50; //the max number of tasks before a new map is created
-    private $max_map_count     = 10; // the max number of maps
+    private $max_tasks_per_map = 500; //the max number of tasks before a new map is created
+    private $max_map_count     = 100; // the max number of maps
     
     private $task_ptid   = array(); // tasks maped to there parent task id.
     private $task_map    = array(); // maps with all there tasks
@@ -26,35 +27,46 @@ class scheduler {
         //print_r($this->debug());
         do{
             if(!empty($this->total_tasks) || $this->__rebuildTaskTotal()) {
-                foreach($this->task_map as $map_id=>$map) {
+                foreach($this->task_map as $map_id=>&$map) {
                     //var_dump($map_id, $map);
                     if($this->map_counts[$map_id] > 0) foreach($map as $task_id=>&$task) {
                         //var_dump($task);
                         $this->curr_task =& $task;
                         $retval = $task->run();
-                        if(!empty($retval) && !is_bool($retval)) foreach($retval as $dat)   {
+                        if(!empty($retval) && !is_bool($retval)) foreach($retval as &$dat)   {
                             if ($dat instanceof systemCall) {
                                 $dat($task, $this);
                             }
                             elseif($dat instanceof task) {
-                                $task_id = $this->addTask(array(), $dat);
-                                $this->__setTaskParentId($task->getTaskId(), $task_id);
+                                $this->__setTaskParentId($task->getTaskId(), $this->addTask(array(), $dat));
                             }
                             elseif($dat instanceof coProxyValue) {
                                 $this->__processProxy($dat, $this->curr_task);
                             }
                         }
+                        unset($retval);
                         
                         if ($task->isFinished()) {
                            $this->delTask($task_id);
                         }
+                        
+                        /*if(mt_rand(1, 1000) == 1) {
+                           print memory_get_usage().PHP_EOL;
+                           gc_collect_cycles();
+                           print memory_get_usage().PHP_EOL;
+                           print "========".PHP_EOL;
+                       }*/
                     }
                 }
+                //if(time()%10 == 0) {
+                //print_r(array( $this->total_tasks, count($this->tasks), count($this->task_map),$this->map_counts,));
+                //}
             } else {
                 print "no tasks".PHP_EOL;
+                $count++;
             }
-            $count++;
         } while( (is_null($passes) || $passes< $count) && ($this->total_tasks > 0 || $this->__rebuildTaskTotal()) );
+        print "bye";
     }
     
     function debug() {
@@ -103,11 +115,13 @@ class scheduler {
         if(isset($this->tasks[$task_id])) {
             $map_ids = $this->tasks2map[$task_id];
             $this->__unsetTaskParentId($task_id);
+            //debug_zval_dump($this->tasks[$task_id]);
             foreach($map_ids as $dex=>$dat) {
                 $this->total_tasks--;
                 $this->map_counts[$dat]--;
                 unset($this->task_map[$dat][$task_id]);
             }
+            $this->tasks[$task_id] = null;
             unset($this->tasks2map[$task_id], $this->tasks[$task_id]);
             //print "delting task:$task_id".PHP_EOL;
             return True;

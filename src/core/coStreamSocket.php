@@ -38,6 +38,17 @@ class coStreamSocket {
         }
         return False;
     }
+    
+    function isExcept() {
+        $stream = Null;
+        $write  = Null;
+        $except = array($this->stream);
+        //print "waiting";
+        if(stream_select($stream, $write, $except, 0, 0) > 0) {
+            return True;
+        }
+        return False;
+    }
 }
 
 ?>

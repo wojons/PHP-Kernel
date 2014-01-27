@@ -22,6 +22,10 @@ class task {
         $this->name = (isset($opt['name'])) ? $opt['name'] : null;
     }
     
+    function __destruct() {
+        print "killing task".PHP_EOL;
+    }
+    
     function setTaskId($id) {
         $this->task_id = $id;
     }
@@ -88,7 +92,7 @@ class task {
     private function getRetval() {
         if(!empty($this->retval)) {
             $r = $this->retval;
-            $this->retval = null;
+            $this->retval = array();
             return $r;
         }
         return null;
@@ -97,7 +101,7 @@ class task {
     function run() {
         if(!empty($this->events)) {
             foreach($this->events as $eId => $event ) {
-                $event->run();
+                $e = $event->run();
                 
                 if(!$event->isValid()) {
                     unset($this->events[$eId]);
@@ -121,7 +125,10 @@ class task {
         
     }
     
-    function addEvent(event $event) {
+    function addEvent(event $event, $name=null) {
+        if(isset($name)) {
+            $event->name = $name;
+        }
         $this->events[] = $event;
         return True;
     }
