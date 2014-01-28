@@ -59,17 +59,13 @@ class scheduler {
                             $this->tasks[$task_id]->__delSelf();
                             $this->delTask($task_id);
                         }
-                        
-                        
                     }
                 }
             } else {
                 print "no tasks".PHP_EOL;
                 $count++;
             }
-            
-            if($this->settings['loadAvg']) { $this->updateLoadAvg(microtime(True)-$loadAvgPass);}
-            
+            if($this->settings['loadAvg']) { $this->updateLoadAvg(microtime(True)-$loadAvgPass); }
             
         } while( (is_null($passes) || $passes< $count) && ($this->total_tasks > 0 || $this->__rebuildTaskTotal()) );
         print "bye";
@@ -121,7 +117,6 @@ class scheduler {
         if(isset($this->tasks[$task_id])) {
             $map_ids = $this->tasks2map[$task_id];
             $this->__unsetTaskParentId($task_id);
-            //debug_zval_dump($this->tasks[$task_id]);
             foreach($map_ids as $dex=>$dat) {
                 $this->total_tasks--;
                 $this->map_counts[$dat]--;
@@ -245,9 +240,11 @@ class scheduler {
     }
     
     private function updateLoadAvg($passTime) {
-        $this->loadAvg = Null; //set to blank so we know to recompute
-        $last = $this->loadAvgRaw->prepend($passTime);
-        //var_dump($this->loadAvgRaw);
+        if($passTime >= 0.009) {
+            $this->loadAvg = Null; //set to blank so we know to recompute
+            $last = $this->loadAvgRaw->prepend($passTime);
+            //var_dump($this->loadAvgRaw);
+        }
     }
     
     public function getLoadAvg() {
