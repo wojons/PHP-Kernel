@@ -57,7 +57,7 @@ class event {
             
         } elseif($this->event instanceof Generator) {
             if(empty($this->pending)) {
-                return $this->event->next();
+                return $this->event->send(null);
             }
             return $this->event->send($this->getPending(True));
         }

@@ -40,6 +40,8 @@ class httpRequest extends coStreamSocket {
     protected $bodySent    = False;
     protected $bodyStarted = False;
     
+    private $max_accept_time = 5;
+    
     function __construct(&$stream, &$task) {
         //set the times of the request
         $this->reqTimeFloat  = microtime(true);
@@ -132,10 +134,9 @@ class httpRequest extends coStreamSocket {
     function isOpen(&$that, $data) {
         yield;
         while(True) {
-            if(microtime(true)-$that->super['conn']->reqTimeFloat >= 1) {
+            if(microtime(true)-$that->super['conn']->reqTimeFloat >= $this->max_accept_time) {
                 print "lost".PHP_EOL;
-                $that->setFinshed(True);
-                break;
+                $that->setFinshed(True); break;
             }
             yield;
         }
@@ -245,7 +246,8 @@ class httpRequest extends coStreamSocket {
         $this->reqGlobal   = array(
             '$_SERVER' => $this->getServerGlobal(),
             '$_GET'    => $this->getGetGlobal(),
-            '$_POST'    => $this->getPostGlobal(),
+            '$_POST'   => $this->getPostGlobal(),
+            '$_COOKIE' => $this->getCookieGlobal(),
         );
         $this->reqReady = True;
     }
@@ -298,6 +300,14 @@ class httpRequest extends coStreamSocket {
             }
         }
         return $post;
+    }
+    
+    function getCookieGlobal() {
+        $cookie = array();
+        if(isset($this->reqHeaders['Cookie'])) {
+            parse_str($this->reqHeader['Cookie'], $cookie);
+        }
+        return $cookie;
     }
     
     function addHeader($header, $value) {

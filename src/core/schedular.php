@@ -4,6 +4,7 @@
 
 
 require_once(dirname(__FILE__).'/task.php');
+require_once(dirname(__FILE__).'/systemCall.php');
 require_once(dirname(__FILE__).'/corutineReturnValue.php');
 require_once(dirname(__FILE__).'/util.php');
 
@@ -26,6 +27,7 @@ class scheduler {
         $count  = 0;
         //print_r($this->debug());
         do{
+            //print_r(array('ptid' => $this->task_ptid));
             if(!empty($this->total_tasks) || $this->__rebuildTaskTotal()) {
                 foreach($this->task_map as $map_id=>&$map) {
                     //var_dump($map_id, $map);
@@ -71,7 +73,7 @@ class scheduler {
     }
     
     function debug() {
-        return array('total_maps' => $this->total_maps, 'total_tasks' => $this->total_tasks, 'map_counts' => $this->map_counts, 'tasks' => $this->tasks, 'task_map' => $this->task_map, 'task2map' =>$this->tasks2map);
+        return array('total_maps' => $this->total_maps, 'total_tasks' => $this->total_tasks, 'map_counts' => $this->map_counts, 'tasks' => $this->tasks, 'task_map' => $this->task_map, 'task2map' =>$this->tasks2map, 'task_parent' => $this->task_ptid);
     }
     
     private function __addTaskToMap($task_id, $priority=1) {
@@ -239,6 +241,14 @@ class scheduler {
         }
     }
     
+    public function areAnyChildTasks() {
+        return !empty($this->task_ptid) ? True : False;
+    }
+    
+    public function getChildTasks($parent_id) {
+        return $this->task_ptid[$parent_id];
+    }
+    
     private function __setTaskParentId($parent_id, $task_id) {
         $this->task_ptid[$parent_id][$task_id] =& $this->tasks[$task_id];
         $this->tasks[$task_id]->setParentId($parent_id);
@@ -246,6 +256,9 @@ class scheduler {
     
     private function __unsetTaskParentId($task_id) {
         unset($this->task_ptid[$this->tasks[$task_id]->getParentId()][$task_id]);
+        if(empty($this->task_ptid[$this->tasks[$task_id]->getParentId()])) { //if its empty remove it
+            unset($this->task_ptid[$this->tasks[$task_id]->getParentId()]);
+        }
         $this->tasks[$task_id]->setParentId(null);
     }
     

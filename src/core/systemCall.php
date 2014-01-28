@@ -8,7 +8,7 @@ class systemCall {
     }
     
     public function __invoke(task $task, scheduler $schduler) {
-        $callback =& $this->callback;
+        $callback = $this->callback;
         return $callback($task, $schduler);
     }
 }

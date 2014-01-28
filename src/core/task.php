@@ -23,7 +23,7 @@ class task {
     }
     
     function __destruct() {
-        print "killing task".PHP_EOL;
+        //print "killing task".PHP_EOL;
     }
     
     function setTaskId($id) {
@@ -99,9 +99,15 @@ class task {
     }
     
     function run() {
+        if(!$this->loopCheck() || !$this->sleepCheck()) {
+            return False;
+        }
         if(!empty($this->events)) {
             foreach($this->events as $eId => $event ) {
                 $e = $event->run();
+                if(!is_null($e) || is_bool($e)) {
+                    $this->setRetval($e);
+                }
                 
                 if(!$event->isValid()) {
                     unset($this->events[$eId]);
@@ -111,18 +117,6 @@ class task {
         
         $this->script->__invoke($this);
         return $this->getRetval();
-        
-        
-        /*if ($this->b4Yield) {
-            $this->b4Yield = false;
-            $this->coroutine->current();
-            $this->coroutine->send($this);
-            return True;
-        } else {
-            $retval = $this->coroutine->send($this->receiveValue());
-            return $retval;
-        }*/
-        
     }
     
     function addEvent(event $event, $name=null) {
@@ -148,11 +142,54 @@ class task {
         return False;
     }
     
+    function sleepCheck() {
+        if(isset($this->sleepTill)) {
+            if($this->sleepTill > time()) {
+                return False;
+            }
+            $this->sleepTill = Null;
+        }
+        return True;
+    }
+    
+    function loopCheck() {
+        if(isset($this->sleepLoop) && $this->sleepLoop > 0) {
+            $this->sleepLoop--;
+            return False;
+        }
+        return True;
+    }
+    
     function setFinshed($state) {
         if (is_bool($state)) {
             $this->finished = $state;
             return True;
         }
+        return False;
+    }
+    
+    function sleep($time) {
+        if(is_int($time) && $time > 0) {
+            $time->sleepUntil($time+time());
+            return True;
+        }
+        return False;
+    }
+    
+    function sleepUntil($until) {
+        if($until-time() > 0) {
+            $this->sleepTill = $until;
+            return True;
+        }
+        return False;
+    }
+    
+    //sleep for this many passes
+    function sleepLoop($loops) {
+        if(is_int($loops) && $loops > 0) {
+            $this->sleepLoop = (int)$loops;
+            return True;
+        };
         return False;
     }
     
