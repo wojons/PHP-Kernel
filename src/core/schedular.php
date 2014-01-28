@@ -21,12 +21,19 @@ class scheduler {
     private $total_maps  = 0; // total number of maps in the system
     private $total_tasks = 0; // total number of tasks in the system faster then running a count on $this->tasks
     private $curr_task   = null; //current task in scope
+    private $loadAvg     = null;
+    private $loadAvgRaw  = null;
+    private $settings    = array('loadAvg' => False);
     
     function run($passes=null) {
         $passes = (!is_int($passes)) ? $passes : null;
         $count  = 0;
+        $this->loadAvgRaw = (new arrayQueue(900));
         //print_r($this->debug());
         do{
+            
+            if($this->settings['loadAvg']) { $loadAvgPass = microtime(True); }
+            
             //print_r(array('ptid' => $this->task_ptid));
             if(!empty($this->total_tasks) || $this->__rebuildTaskTotal()) {
                 foreach($this->task_map as $map_id=>&$map) {
@@ -53,21 +60,17 @@ class scheduler {
                             $this->delTask($task_id);
                         }
                         
-                        /*if(mt_rand(1, 1000) == 1) {
-                           print memory_get_usage().PHP_EOL;
-                           gc_collect_cycles();
-                           print memory_get_usage().PHP_EOL;
-                           print "========".PHP_EOL;
-                       }*/
+                        
                     }
                 }
-                //if(time()%10 == 0) {
-                //print_r(array( $this->total_tasks, count($this->tasks), count($this->task_map),$this->map_counts,));
-                //}
             } else {
                 print "no tasks".PHP_EOL;
                 $count++;
             }
+            
+            if($this->settings['loadAvg']) { $this->updateLoadAvg(microtime(True)-$loadAvgPass);}
+            
+            
         } while( (is_null($passes) || $passes< $count) && ($this->total_tasks > 0 || $this->__rebuildTaskTotal()) );
         print "bye";
     }
@@ -239,6 +242,25 @@ class scheduler {
                 $this->__proxyByParent($proxy, $task->getParentId(), array($task->getId()));
                 break;
         }
+    }
+    
+    private function updateLoadAvg($passTime) {
+        $this->loadAvg = Null; //set to blank so we know to recompute
+        $last = $this->loadAvgRaw->prepend($passTime);
+        //var_dump($this->loadAvgRaw);
+    }
+    
+    public function getLoadAvg() {
+        if (is_null($this->loadAvg)) {
+            if(!$this->loadAvgRaw->isEmpty()) {
+                $this->loadAvg = array(
+                    array_sum(array_splice($this->loadAvgRaw->getArray(), 0, 60))/60,
+                    array_sum(array_splice($this->loadAvgRaw->getArray(), 0, 300))/300,
+                    array_sum(array_splice($this->loadAvgRaw->getArray(), 0, 900))/900,
+                );
+            }
+        }
+        return $this->loadAvg;
     }
     
     public function areAnyChildTasks() {

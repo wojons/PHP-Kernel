@@ -11,8 +11,7 @@ $kernel->addTask(array('name' => 'httpServer'), function(&$that) {
         $that->super['count']  = 0;
         $that->super['anySubTasksExists'] = Null;
         $any_sub_tasks = function(&$that, $data) {
-            yield;
-            while(True) {
+            yield; while(True) {
                 yield ((new systemCall(function($task, $scheduler) {
                     $task->super['anySubTasksExists'] = $scheduler->areAnyChildTasks();
                 })));

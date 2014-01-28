@@ -305,7 +305,7 @@ class httpRequest extends coStreamSocket {
     function getCookieGlobal() {
         $cookie = array();
         if(isset($this->reqHeaders['Cookie'])) {
-            parse_str($this->reqHeader['Cookie'], $cookie);
+            parse_str($this->reqHeaders['Cookie'], $cookie);
         }
         return $cookie;
     }
