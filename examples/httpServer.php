@@ -30,12 +30,11 @@ $kernel->addTask(array('name' => 'httpServer'), function(&$that) {
                 $that->super['local']  = stream_socket_get_name($that->super['conn']->getStream(), False);
                 $that->super['conn']->bootstrapRequest();
                 
-                
             }
             if($that->super['conn']->reqReady() == True && $that->super['conn']->headersSent() == False) {
-                $that->super['conn']->addHeader("", "HTTP/1.1 200 OK");
+                $that->super['conn']->addHeader("HTTP/1.1 200 OK");
                 $that->super['conn']->addHeader("Date", gmdate('D, d M Y H:i:s ', time()) . 'GMT');
-                $that->super['conn']->bodyWrite("fsajflksdajflksadjflk;sajfklsadfjsda");
+                $that->super['conn']->bodyWrite("hello world");
             }
             
             if($that->super['conn']->bodySent() == True) {

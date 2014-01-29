@@ -13,17 +13,19 @@ class scheduler {
     private $max_tasks_per_map = 500; //the max number of tasks before a new map is created
     private $max_map_count     = 100; // the max number of maps
     
-    private $task_ptid   = array(); // tasks maped to there parent task id.
-    private $task_map    = array(); // maps with all there tasks
-    private $tasks       = array(); // all the tasks
-    private $tasks2map   = array(); // task id => map id
-    private $map_counts  = array(); // number of tasks in each map (faster then runing count all the time)
-    private $total_maps  = 0; // total number of maps in the system
-    private $total_tasks = 0; // total number of tasks in the system faster then running a count on $this->tasks
-    private $curr_task   = null; //current task in scope
-    private $loadAvg     = null;
-    private $loadAvgRaw  = null;
-    private $settings    = array('loadAvg' => False);
+    private $task_ptid      = array(); // tasks maped to there parent task id.
+    private $task_map       = array(); // maps with all there tasks
+    private $tasks          = array(); // all the tasks
+    private $tasks2map      = array(); // task id => map id
+    private $map_counts     = array(); // number of tasks in each map (faster then runing count all the time)
+    private $total_maps     = 0; // total number of maps in the system
+    private $total_tasks    = 0; // total number of tasks in the system faster then running a count on $this->tasks
+    private $curr_task      = null; //current task in scope
+    private $loadAvg        = null;
+    private $loadAvgRaw     = null;
+    private $settings       = array('loadAvg' => False);
+    private $watch_stream   = array('read' => array(), 'write' => array());
+    private $updated_stream = 0;
     
     function run($passes=null) {
         $passes = (!is_int($passes)) ? $passes : null;
@@ -31,8 +33,11 @@ class scheduler {
         $this->loadAvgRaw = (new arrayQueue(900));
         //print_r($this->debug());
         do{
-            
+            //top of loop
             if($this->settings['loadAvg']) { $loadAvgPass = microtime(True); }
+            if(!empty($this->watch_steam['read']) || !empty($this->watch_stream['write'])) {
+                $this->checkStream(0);
+            }
             
             //print_r(array('ptid' => $this->task_ptid));
             if(!empty($this->total_tasks) || $this->__rebuildTaskTotal()) {
@@ -94,15 +99,12 @@ class scheduler {
     
     function addTask($opt, $cb) {
         if ($cb instanceof task) {
-            $this->tasks[] =& $cb;
+            $task_id = array_push($this->tasks, $cb)-1;
         } else {
-            $this->tasks[] = new task($opt, $cb);
+            $task_id = array_push($this->tasks, (new task($opt, $cb)))-1;
         }
-        
+
         $priority = isset($opt['priority']) ? $opt['priority'] : 1;
-        
-        end($this->tasks);
-        $task_id = key($this->tasks);
         $map_counts = $this->__addTaskToMap($task_id, $priority);
         
         if($map_counts < 0) {//unable to apply to a map
@@ -253,7 +255,7 @@ class scheduler {
                 $this->loadAvg = array(
                     array_sum(array_splice($this->loadAvgRaw->getArray(), 0, 60))/60,
                     array_sum(array_splice($this->loadAvgRaw->getArray(), 0, 300))/300,
-                    array_sum(array_splice($this->loadAvgRaw->getArray(), 0, 900))/900,
+                    array_sum($this->loadAvgRaw->getArray())/900,
                 );
             }
         }
@@ -266,6 +268,40 @@ class scheduler {
     
     public function getChildTasks($parent_id) {
         return $this->task_ptid[$parent_id];
+    }
+    
+    public function checkStream($timeout=0) {
+        $count = stream_select($this->watch_stream['read'], $this->watch_stream['write'], $this->watch_stream['error'], $timeout);
+        if($count > 0) {
+            if(!empty($this->watch_stream['read'])) foreach($this->watch_stream['read'] as $dex => $dat) {
+                $this->pending_select['read'][$dex] = True;
+                unset($this->watch_stream['read'][$dex]);
+            }
+            
+            if(!empty($this->watch_stream['write'])) foreach($this->watch_stream['write'] as $dex => $dat) {
+                $this->pending_select['write'][$dex] = True;
+                unset($this->watch_stream['write'][$dex]);
+            }
+            
+            if(!empty($this->watch_stream['error'])) foreach($this->watch_stream['error'] as $dex => $dat) {
+                $this->pending_select['error'][$dex] = True;
+                unset($this->watch_stream['error'][$dex]);
+            }
+            
+            return $count;
+        }
+        return False;
+    }
+    
+    public function addStream2Watch(&$read, &$write, &$error) {
+        if(!is_null($read)):
+            $this->watch_stream['read'][$read[0]]   =& $read[1];
+        
+        if(!is_null($write)):
+            $this->watch_stream['write'][$write[0]] =& $write[1];
+        
+        if(!is_null($error)):
+            $this->watch_stream['error'][$error[0]] =& $error[1];
     }
     
     private function __setTaskParentId($parent_id, $task_id) {

@@ -51,6 +51,10 @@ class httpRequest extends coStreamSocket {
         $this->task = $task;
     }
     
+    function __destruct() {
+        fclose($that->super['conn']->getStream());
+    }
+    
     function bootstrapRequest() {
         $this->task->addEvent( //read te request
             (new event($this->task, $this->readRequest($this->task, null), function() {
@@ -192,6 +196,7 @@ class httpRequest extends coStreamSocket {
     
     function client499() {
         print "499".PHP_EOL;
+        fclose($that->super['conn']->getStream());
         return $this->task->setFinshed(True);
     }
     
@@ -200,7 +205,7 @@ class httpRequest extends coStreamSocket {
         yield;
         while(True) {
             if(!empty($this->pendingHeaders)) foreach($this->pendingHeaders as $dex=>$dat) {
-                if(@fwrite($http->getStream(), "$dex: $dat\r\n") === False) {
+                if(@fwrite($http->getStream(), "$dex".(isset($dat) ? ": $dat\r\n" : "\r\n")) === False) {
                     $this->client499();
                 }
                 $this->headersSent = True;
@@ -310,7 +315,7 @@ class httpRequest extends coStreamSocket {
         return $cookie;
     }
     
-    function addHeader($header, $value) {
+    function addHeader($header, $value=null) {
         if( !isset($this->resHeaders[$header]) || isset($this->pendingHeaders[$header]) ) {
             $this->resHeaders[$header]     = $value;
             $this->pendingHeaders[$header] = $value;
