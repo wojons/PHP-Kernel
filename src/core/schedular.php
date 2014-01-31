@@ -38,7 +38,13 @@ class scheduler {
         do{
             //top of loop
             if($this->settings['loadAvg']) { $loadAvgPass = microtime(True); }
-            
+            //print count($this->pending_select, COUNT_RECURSIVE).PHP_EOL;
+            //print $this->total_tasks.PHP_EOL;
+            /*if(mt_rand(0, 1000) == 0) {
+                foreach($this->pending_select as $dex=>$dat) {
+                    if(empty($dat)) { unset($this->pending_select[$dex]); }
+                }
+            }*/
             if(!empty($this->watch_stream['read']) || !empty($this->watch_stream['write'])) {
                 $this->checkStream(0);
             }
@@ -76,7 +82,7 @@ class scheduler {
             }
             if($this->settings['loadAvg']) { $this->updateLoadAvg(microtime(True)-$loadAvgPass); }
             
-        } while( (is_null($passes) || $passes< $count) && ($this->total_tasks > 0 || $this->__rebuildTaskTotal()) );
+        } while( (empty($passes) || $passes< $count) && ($this->total_tasks > 0 || $this->__rebuildTaskTotal()) );
         print "bye";
     }
     
@@ -257,7 +263,7 @@ class scheduler {
     }
     
     public function getLoadAvg() {
-        if (is_null($this->loadAvg)) {
+        if ($this->loadAvg === Null) {
             if(!$this->loadAvgRaw->isEmpty()) {
                 $this->loadAvg = array(
                     array_sum(array_splice($this->loadAvgRaw->getArray(), 0, 60))/60,
@@ -326,7 +332,11 @@ class scheduler {
         return False;
     }
     
-    public function delPendingSelect($fd, $type) {
+    public function delPendingSelect($fd, $type=null) {
+        if($type==null) {
+            unset($this->pending_select[$fd]);
+            return True;
+        }
         unset($this->pending_select[$fd][$type]);
     }
     

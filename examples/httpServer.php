@@ -5,7 +5,7 @@ require_once('../src/core/coStreamSocketServer.php');
 require_once('../src/server/httpServer.php');
 
 $kernel = new scheduler();
-$kernel->addTask(array('name' => 'httpServer'), function(&$that) {
+$kernel->addTask(array('name' => 'httpServer', 'priority' => 1), function(&$that) {
     if(!isset($that->super['server'])) {
         $that->super['server'] = new coStreamSocketServer('tcp://0.0.0.0:9191');
         $that->super['count']  = 0;
@@ -40,7 +40,7 @@ $kernel->addTask(array('name' => 'httpServer'), function(&$that) {
             //var_dump($that->super['conn']->bodySent());
             //var_dump($that->super['conn']->pendingBody);
             //var_dump($that->super['conn']->getWriteBufferSize());
-            if($that->super['conn']->bodySent() == True && empty($that->super['conn']->pendingBody) && $that->super['conn']->getWriteBufferSize() == 0) {
+            if($that->super['conn']->bodySent() == True && empty($that->super['conn']->pendingBody) && $that->super['conn']->isWriteBufferEmpty()) {
 
                 fclose($that->super['conn']->getStream());
                 $that->setFinshed(True);

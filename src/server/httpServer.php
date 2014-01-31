@@ -56,13 +56,16 @@ class httpRequest extends coStreamSocket {
     
     function __destruct() {
         @fclose($this->task->super['conn']->getStream());
+        parent::__destruct();
     }
     
     function bootstrapRequest() {
         $readEvent  = $this->task->super['conn']->readEvent($this->task, null);
         $writeEvent = $this->task->super['conn']->writeEvent($this->task, null);
+        $watchEvent = $this->task->super['conn']->watchEvent($this->task, null);
         $this->task->addEvent((new event($this->task, $readEvent)), 'readEvent');
         $this->task->addEvent((new event($this->task, $writeEvent)), 'writeEvent');
+        $this->task->addEvent((new event($this->task, $watchEvent)), 'watchEvent');
         
         $this->task->addEvent( //read te request
             (new event($this->task, $this->readRequest($this->task, null)))
@@ -177,10 +180,9 @@ class httpRequest extends coStreamSocket {
                 
                 $http->addRawReqHeaders($line);
                 $http->read_buffer = substr($http->read_buffer, strlen($line)+2);
+            } else {
+                yield;
             }
-            
-            yield;
-            continue;
         }
     }
     

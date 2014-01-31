@@ -18,9 +18,15 @@ class coStreamSocket {
         }
     }
     
+    function __destruct() {
+        
+    }
+    
     function mkStreamAsync($timeout=0) {
         stream_set_blocking($this->stream, 0);
         stream_set_timeout($this->stream, $timeout);
+        stream_set_read_buffer($this->stream, 0);
+        stream_set_write_buffer($this->stream, 0);
     }
     
     function &getStream() {
@@ -35,8 +41,8 @@ class coStreamSocket {
         if($this->read_buffer_max == -1) {
             return True;
         }
-        elseif(strlen($this->read_buffer) < $this->read_buffer_max) {
-            return $this->read_buffer_max - strlen($this->read_buffer);
+        elseif(strlen($buff_size = $this->read_buffer) < $this->read_buffer_max) {
+            return $this->read_buffer_max - strlen($buff_size);
         }
         return False;
     }
@@ -47,12 +53,13 @@ class coStreamSocket {
         $fd     =& $stream->getFD();
         $task   =& $this->task;
         $none   = array();
-        $readS  = array($fd, $stream->getStream());
+        //$readS  = array($fd, $stream->stream);
         
         while(True) {
             $availReadBuffer = $stream->availReadBuffer();
             
             if(isset($task->pending_fd[$fd]['read']) && $task->pending_fd[$fd]['read'] == True && ($availReadBuffer == True || $availReadBuffer > 0)) {
+            //if( ($availReadBuffer == True || $availReadBuffer > 0)) {
                 $read = $this->doRead();
                 if($read === False) {
                     exit();
@@ -60,13 +67,33 @@ class coStreamSocket {
                 unset($task->pending_fd[$fd]['read']);
             }
             
-            $task->setRetval((new systemCall(function($task, $scheduler) use ($readS, $none){
-                $scheduler->addStream2Watch($readS, $none, $none);
+            yield;
+        }
+    }
+    
+    function watchEvent($that, $data) {
+        yield;
+        $stream  =& $this->task->super['conn'];
+        $fd      =& $stream->getFD();
+        $task    =& $this->task;
+        $none    = array();
+        $sockets = array($fd, $stream->stream);
+        while(true) {
+            $task->setRetval((new systemCall(function($task, $scheduler) use ($sockets, $none){
+                $scheduler->addStream2Watch($sockets, $sockets, $none);
             })));
             $task->setRetval(new systemCall(function($task, $scheduler) use ($fd){
-                if(isset($scheduler->isPendingSelect($fd)['read']) && $scheduler->isPendingSelect($fd)['read'] == True) {
-                    $task->pending_fd[$fd]['read'] = True;
-                    $scheduler->delPendingSelect($fd, 'read');
+                if($pending = $scheduler->isPendingSelect($fd)) {
+                    if(isset($pending['read'])) {
+                        $task->pending_fd[$fd]['read'] = True;
+                    }
+                    if(isset($pending['write'])) {
+                        $task->pending_fd[$fd]['write'] = True;
+                    }
+                    if(isset($pending['error'])) {
+                        $task->pending_fd[$fd]['error'] = True;
+                    }
+                    $scheduler->delPendingSelect($fd);
                 }
             }));
             
@@ -76,7 +103,7 @@ class coStreamSocket {
     
     private function doRead() {
         $availReadBuffer = $this->availReadBuffer();
-        $read = fread($this->getStream(), ((is_int($availReadBuffer)) ? $availReadBuffer : $this->default_read_buffer));
+        $read = fread($this->stream, ((is_int($availReadBuffer)) ? $availReadBuffer : $this->default_read_buffer));
         if($read !== False) {
             $this->read_buffer .= $read;
             return $read;
@@ -90,13 +117,14 @@ class coStreamSocket {
         $fd     =& $stream->getFD();
         $task   =& $this->task;
         $none   = array();
-        $writeS = array($fd, $stream->getStream());
+        //$writeS = array($fd, $stream->getStream());
         
         while(True) {
             //print "write loop".PHP_EOL;
             if(isset($task->pending_fd[$fd]['write']) && $task->pending_fd[$fd]['write'] == True && !empty($this->write_buffer)) {
+            //if( !empty($this->write_buffer)) {
                 
-                $written = @fwrite($stream->getStream(), $this->write_buffer);
+                $written = @fwrite($stream->stream, $this->write_buffer);
                 //var_dump($written);
                 if($written == False) {
                     $this->isClientAlive = False;
@@ -111,22 +139,10 @@ class coStreamSocket {
                 }
                 
                 unset($task->pending_fd[$fd]['write']);
-                /*print "said i could write".PHP_EOL;
-                var_dump($written);
-                var_dump($this->write_buffer);*/
             } else {
                 //var_dump($this->doRead());
             }
-            
-            $task->setRetval((new systemCall(function($task, $scheduler) use ($writeS, $none){
-                $scheduler->addStream2Watch($none, $writeS, $none);
-            })));
-            $task->setRetval(new systemCall(function($task, $scheduler) use ($fd){
-                if($scheduler->isPendingSelect($fd)['write'] == True) {
-                    $task->pending_fd[$fd]['write'] = True;
-                    $scheduler->delPendingSelect($fd, 'write');
-                }
-            }));
+
             yield;
         }
     }
@@ -138,6 +154,10 @@ class coStreamSocket {
     
     function getWriteBufferSize() {
         return strlen($this->write_buffer);
+    }
+    
+    function isWriteBufferEmpty() {
+        return !empty($this->write_buffer);
     }
     
     function isClientAlive() {

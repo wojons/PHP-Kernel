@@ -23,6 +23,7 @@ class fileDescriptor {
     }
     
     function __destruct() {
+        $micro = microtime(true);
         foreach($this->table as $dex=>$dat) {
             unset($this->table[$dex]);
         }
@@ -39,7 +40,7 @@ class fileDescriptor {
     }
     
     function add(&$fd, $type=null) {
-        $type = is_null($type) ? 'main' : $type;
+        $type = ($type === Null) ? 'main' : $type;
         $fd_id                     = $this->getNextFd();
         $this->table[$fd_id]       =& $fd;
         $this->type[$type][$fd_id] =& $this->table[$fd_id];

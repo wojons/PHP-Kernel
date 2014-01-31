@@ -72,7 +72,7 @@ class task {
     }
     
     function setParentId($ptid) {
-        if(is_null($this->ptid) || is_null($ptid)) {
+        if($this->ptid === Null || $ptid === Null) {
             $this->ptid = $ptid;
             return True;
         }
@@ -109,7 +109,7 @@ class task {
         if(!empty($this->events)) {
             foreach($this->events as $eId => $event ) {
                 $e = $event->run();
-                if(!is_null($e)) {
+                if($e !== Null) {
                     $this->setRetval($e);
                 }
                 

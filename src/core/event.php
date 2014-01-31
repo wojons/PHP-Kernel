@@ -6,16 +6,19 @@ class event {
     public $check = null;
     public $data  = null;
     
+    public $checkIs;
+    public $eventIs;
+    
     public $vaild = True;
     public $name  = "";
     
     function __construct(&$task, $data, $event=null, $check=null) {
         $this->task  =& $task;
         
-        if((is_callable($data) || $data instanceof Generator)&& is_null($event) && is_null($check)) {
+        if((is_callable($data) || $data instanceof Generator)&& $event === Null && $check === NUll) {
             $this->event = $data;
         }
-        elseif((is_callable($data) || $data instanceof Generator) && is_callable($event) && is_null($check)) {
+        elseif((is_callable($data) || $data instanceof Generator) && is_callable($event) && $check === Null) {
             $this->event = $data;
             $this->check = $event;
         }
@@ -28,6 +31,21 @@ class event {
             $this->event = $event;
             $this->check = $check;
         }
+        
+        if(is_callable($this->event)) {
+            $this->eventIs = 'callback';
+        } else {
+            $this->eventIs = 'generator';
+        }
+        
+        /*if($this->check !== Null) {
+            if(is_callable($this->event)) {
+                $this->checkIs == 'callback';
+            } else {
+                $this->checkIs = 'generator';
+            }
+        }*/
+        
         //print "a9"; var_dump(array($task, $data, $event, $check));
     }
     
@@ -46,16 +64,16 @@ class event {
     }
     
     function run() {
-        if(!is_null($this->check) && $this->check->__invoke() == False) {
+        if(!empty($this->check) && $this->check->__invoke() == False) {
             return False;
         }
         
-        if(is_callable($this->event)) {
+        if($this->eventIs == 'callback') {
             $retval = $this->event->__invoke($this->task, $this->data);
             $this->vaild = False;
             return $retval;
             
-        } elseif($this->event instanceof Generator) {
+        } elseif($this->eventIs == 'generator') {
             if(empty($this->pending)) {
                 //print $this->name.PHP_EOL;
                 return $this->event->send(null);
