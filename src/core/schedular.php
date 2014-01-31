@@ -10,6 +10,8 @@ require_once(dirname(__FILE__).'/util.php');
 
 class scheduler {
     
+    private $pending_select =  array();
+    
     private $max_tasks_per_map = 500; //the max number of tasks before a new map is created
     private $max_map_count     = 100; // the max number of maps
     
@@ -27,6 +29,7 @@ class scheduler {
     private $watch_stream   = array('read' => array(), 'write' => array());
     private $updated_stream = 0;
     
+    
     function run($passes=null) {
         $passes = (!is_int($passes)) ? $passes : null;
         $count  = 0;
@@ -35,7 +38,8 @@ class scheduler {
         do{
             //top of loop
             if($this->settings['loadAvg']) { $loadAvgPass = microtime(True); }
-            if(!empty($this->watch_steam['read']) || !empty($this->watch_stream['write'])) {
+            
+            if(!empty($this->watch_stream['read']) || !empty($this->watch_stream['write'])) {
                 $this->checkStream(0);
             }
             
@@ -99,10 +103,13 @@ class scheduler {
     
     function addTask($opt, $cb) {
         if ($cb instanceof task) {
-            $task_id = array_push($this->tasks, $cb)-1;
+            $this->tasks[] = $cb;
         } else {
-            $task_id = array_push($this->tasks, (new task($opt, $cb)))-1;
+            $this->tasks[] = (new task($opt, $cb));
         }
+        
+        end($this->tasks); 
+        $task_id = key($this->tasks);
 
         $priority = isset($opt['priority']) ? $opt['priority'] : 1;
         $map_counts = $this->__addTaskToMap($task_id, $priority);
@@ -271,37 +278,56 @@ class scheduler {
     }
     
     public function checkStream($timeout=0) {
-        $count = stream_select($this->watch_stream['read'], $this->watch_stream['write'], $this->watch_stream['error'], $timeout);
+        $count = @stream_select($this->watch_stream['read'], $this->watch_stream['write'], $this->watch_stream['error'], $timeout);
+        
         if($count > 0) {
+            
             if(!empty($this->watch_stream['read'])) foreach($this->watch_stream['read'] as $dex => $dat) {
-                $this->pending_select['read'][$dex] = True;
+                $this->pending_select[$dex]['read'] = True;
                 unset($this->watch_stream['read'][$dex]);
             }
             
             if(!empty($this->watch_stream['write'])) foreach($this->watch_stream['write'] as $dex => $dat) {
-                $this->pending_select['write'][$dex] = True;
+                $this->pending_select[$dex]['write'] = True;
                 unset($this->watch_stream['write'][$dex]);
             }
             
             if(!empty($this->watch_stream['error'])) foreach($this->watch_stream['error'] as $dex => $dat) {
-                $this->pending_select['error'][$dex] = True;
+                $this->pending_select[$dex]['error'] = True;
                 unset($this->watch_stream['error'][$dex]);
             }
-            
             return $count;
         }
+        $this->watch_stream = array('read' => null, 'write' => null, 'error' => null);
         return False;
     }
     
     public function addStream2Watch(&$read, &$write, &$error) {
-        if(!is_null($read)):
+        
+        if(!empty($read)){
             $this->watch_stream['read'][$read[0]]   =& $read[1];
+        }
         
-        if(!is_null($write)):
+        if(!empty($write)) {
             $this->watch_stream['write'][$write[0]] =& $write[1];
+        }
         
-        if(!is_null($error)):
+        if(!empty($error)) {
             $this->watch_stream['error'][$error[0]] =& $error[1];
+        }
+        
+        return true;
+    }
+    
+    public function isPendingSelect($fd) {
+        if(isset($this->pending_select[$fd])) {
+            return $this->pending_select[$fd];
+        }
+        return False;
+    }
+    
+    public function delPendingSelect($fd, $type) {
+        unset($this->pending_select[$fd][$type]);
     }
     
     private function __setTaskParentId($parent_id, $task_id) {

@@ -37,7 +37,11 @@ $kernel->addTask(array('name' => 'httpServer'), function(&$that) {
                 $that->super['conn']->bodyWrite("hello world");
             }
             
-            if($that->super['conn']->bodySent() == True) {
+            //var_dump($that->super['conn']->bodySent());
+            //var_dump($that->super['conn']->pendingBody);
+            //var_dump($that->super['conn']->getWriteBufferSize());
+            if($that->super['conn']->bodySent() == True && empty($that->super['conn']->pendingBody) && $that->super['conn']->getWriteBufferSize() == 0) {
+
                 fclose($that->super['conn']->getStream());
                 $that->setFinshed(True);
             }

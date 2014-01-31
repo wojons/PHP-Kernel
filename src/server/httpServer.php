@@ -12,7 +12,7 @@ class httpServer extends coStreamSocketServer {
 
 class httpRequest extends coStreamSocket {
     
-    public $raw            = array('haders'=>array(), 'body' => array());
+    public $raw            = array('headers'=>array(), 'body' => array());
     public $reqMain        = "";
     public $reqHeaders     = array();
     public $reqGlobal      = array(
@@ -35,52 +35,58 @@ class httpRequest extends coStreamSocket {
     protected $reqMethod   = Null;
     protected $reqReady    = False;
     protected $reqRead     = False;
+    protected $reqReadBody = False;
     protected $reqPrep     = False;
     protected $headersSent = False;
     protected $bodySent    = False;
     protected $bodyStarted = False;
     
-    private $max_accept_time = 5;
+    private $max_accept_time = 2;
     
     function __construct(&$stream, &$task) {
         //set the times of the request
         $this->reqTimeFloat  = microtime(true);
         $this->reqTime       = time();
         
-        parent::__construct($stream);
         $this->task = $task;
+        parent::__construct($stream);
+        $this->mkStreamAsync();
+        $this->setFd($this->task->fd_table->add($stream, 'stream'));
     }
     
     function __destruct() {
-        fclose($that->super['conn']->getStream());
+        @fclose($this->task->super['conn']->getStream());
     }
     
     function bootstrapRequest() {
+        $readEvent  = $this->task->super['conn']->readEvent($this->task, null);
+        $writeEvent = $this->task->super['conn']->writeEvent($this->task, null);
+        $this->task->addEvent((new event($this->task, $readEvent)), 'readEvent');
+        $this->task->addEvent((new event($this->task, $writeEvent)), 'writeEvent');
+        
         $this->task->addEvent( //read te request
-            (new event($this->task, $this->readRequest($this->task, null), function() {
-                return $this->task->super['conn']->canRead();
-            }))
+            (new event($this->task, $this->readRequest($this->task, null)))
         );
         
         //prep the request
-        $this->task->addEvent((new event($this->task, function() {
+        $this->task->addEvent((new event($this->task, function() { 
             return $this->prepRequest();
         }, function() {
-                return $this->task->super['conn']->reqRead(); 
-            })
-        ));
+            //print "checking req read".PHP_EOL;
+            //var_dump($this->reqRead());
+            return $this->reqRead();
+        }
+        )));
         
         //write headers
-        $this->task->addEvent((new event($this->task, $this->writeHeaders($this->task, null), function() {
-                return $this->task->super['conn']->canWrite();
-            })
-        ));
+        $this->task->addEvent((new event($this->task, $this->writeHeaders($this->task, null))));
         
         //is open
         $this->task->addEvent((new event($this->task, $this->isOpen($this->task, null))), "isOpen");
     }
     
     function parseReqHeaders() {
+        
         foreach($this->raw['headers'] as $dat) {
             $header = explode(": ", $dat, 2);
             if(count($header) == 2) {
@@ -138,7 +144,7 @@ class httpRequest extends coStreamSocket {
     function isOpen(&$that, $data) {
         yield;
         while(True) {
-            if(microtime(true)-$that->super['conn']->reqTimeFloat >= $this->max_accept_time) {
+            if(!$that->super['conn']->reqRead() && microtime(true)-$that->super['conn']->reqTimeFloat >= $this->max_accept_time) {
                 print "lost".PHP_EOL;
                 $that->setFinshed(True); break;
             }
@@ -150,25 +156,28 @@ class httpRequest extends coStreamSocket {
     function readRequest(&$that, $data){
         $http =& $that->super['conn'];
         yield;
-        while(strlen($line = fgets($http->getStream())) > 0 && $http->haveReqHeaders == False) {
-            if($line == "\r\n") {
-                $http->haveReqHeaders = True;
-                $http->parseReqHeaders();
-                
-                if(isset($http->reqHeaders['Content-Length'])) {
-                    $that->addEvent(
-                        (new event($this->task, $this->readBody($this->task, null), function() { 
-                            return $this->task->super['conn']->canRead();
-                    })));
+        
+        while($http->haveReqHeaders == False) {
+            if(strlen($line = strstr($http->read_buffer, "\r\n", True)) >= 0 && $line !== False) {
+                if($line == "") {
+                    $http->haveReqHeaders = True;
+                    $http->parseReqHeaders();
+                    $http->read_buffer = substr($http->read_buffer, 2);
+                    
+                    if(isset($http->reqHeaders['Content-Length'])) {
+                        $that->addEvent((new event($this->task, $this->readBody($this->task, null))));
+                        break;
+                    }
+                    elseif (isset($http->reqHeaders['Transfer-Encoding']) &&  $http->reqHeaders['Transfer-Encoding'] == "Chunked") {
+                        
+                    }
+                    $http->reqRead = True;
                     break;
                 }
-                elseif (isset($http->reqHeaders['Transfer-Encoding']) &&  $http->reqHeaders['Transfer-Encoding'] == "Chunked") {
-                    
-                }
-                $http->reqRead = True;
-                break;
+                
+                $http->addRawReqHeaders($line);
+                $http->read_buffer = substr($http->read_buffer, strlen($line)+2);
             }
-            $http->addRawReqHeaders($line);
             
             yield;
             continue;
@@ -182,16 +191,14 @@ class httpRequest extends coStreamSocket {
         $body      = "";
         yield;
         while(True) {
-            $now = fread($http->getStream(), $readUpto-$readTotal);
-            $readTotal += strlen($now);
-            $body .= $now;
-            if($readTotal >= $readUpto) {
-                $http->raw['body'] = $body;
+            if(strlen($http->read_buffer) >= $readUpto) {
+                $http->raw['body'] = $http->read_buffer;
+                $http->read_buffer = "";
                 break;
             }
             yield;
         }
-        $http->reqRead = True;
+        $http->reqReadBody = True;
     }
     
     function client499() {
@@ -205,7 +212,7 @@ class httpRequest extends coStreamSocket {
         yield;
         while(True) {
             if(!empty($this->pendingHeaders)) foreach($this->pendingHeaders as $dex=>$dat) {
-                if(@fwrite($http->getStream(), "$dex".(isset($dat) ? ": $dat\r\n" : "\r\n")) === False) {
+                if($http->bufferWrite("$dex".(isset($dat) ? ": $dat\r\n" : "\r\n")) === False) {
                     $this->client499();
                 }
                 $this->headersSent = True;
@@ -214,9 +221,7 @@ class httpRequest extends coStreamSocket {
             
             if(!empty($this->pendingBody)) {
                 $that->addEvent(
-                        (new event($this->task, $this->writeBody($this->task, null), function() { 
-                            return $this->task->super['conn']->canWrite();
-                    })));
+                        (new event($this->task, $this->writeBody($this->task, null))));
                 break;
             }
             yield;
@@ -226,22 +231,24 @@ class httpRequest extends coStreamSocket {
     function writeBody(&$that, $data) {
         $http =& $that->super['conn'];
         yield;
-        if(@fwrite($http->getStream(), "\r\n") === False) {//blank line for reponse
+        if($http->bufferWrite("\r\n") === False) {//blank line for reponse
             $http->client(499);
         }
         
         while(True) {
             if(!empty($this->pendingBody)) {
                 $write = array_shift($this->pendingBody);
-                if(@fwrite($http->getStream(), $write) === False) {
+                
+                if($http->bufferWrite($write) === False) {
                     $http->client499();
                 }
                 $this->bodySent = True;
             }
+            yield;
             
-            if(empty($this->pendingBody) && $this->bodySent()) {
+            /*if(empty($this->pendingBody) && $this->bodySent()) {
                 break;
-            }
+            }*/
         }
     }
     
@@ -327,6 +334,7 @@ class httpRequest extends coStreamSocket {
     function bodyWrite($body) {
         $this->pendingBody[] = $body;
     }
+    
 }
 
 class websocketServer {

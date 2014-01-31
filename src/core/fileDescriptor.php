@@ -17,9 +17,9 @@ class fileDescriptor {
     
     function __construct() {
         // will build this function out as needed
-        $this->add(Null); //stdin
-        $this->add(Null); //stdout
-        $this->add(Null); //stderr
+        //$this->add(Null); //stdin
+        //$this->add(Null); //stdout
+        //$this->add(Null); //stderr
     }
     
     function __destruct() {
@@ -49,9 +49,9 @@ class fileDescriptor {
     function del($fd) {
         if(isset($this->table[$fd])) {
             foreach($this->type as $dex=>$dat) {
-                return unset($this->table[$fd], $this->type[$dex][$fd]);
+                unset($this->table[$fd], $this->type[$dex][$fd]);
             }
-            return unset($this->table[$fd]); //only used if its rouge;
+            unset($this->table[$fd]); //only used if its rouge;
         }
     }
     

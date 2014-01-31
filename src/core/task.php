@@ -1,12 +1,15 @@
 <?php
 
 require_once(dirname(__FILE__).'/event.php');
+require_once(dirname(__FILE__).'/fileDescriptor.php');
 
 class task {
     
     public $waitFor    = null;
     public $proxyValue = array();
     public $super      = array();
+    public $pending_fd = array(); //so people know the fd needs reads or writes
+    public $fd_table;
     
     private $state;
     private $post_run = array();
@@ -20,6 +23,7 @@ class task {
     function __construct($opt=null, callable $script) {
         $this->script = $script;
         $this->name = (isset($opt['name'])) ? $opt['name'] : null;
+        $this->fd_table = (new fileDescriptor);
     }
     
     function __destruct() {
@@ -105,7 +109,7 @@ class task {
         if(!empty($this->events)) {
             foreach($this->events as $eId => $event ) {
                 $e = $event->run();
-                if(!is_null($e) || is_bool($e)) {
+                if(!is_null($e)) {
                     $this->setRetval($e);
                 }
                 

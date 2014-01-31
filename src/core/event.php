@@ -57,6 +57,7 @@ class event {
             
         } elseif($this->event instanceof Generator) {
             if(empty($this->pending)) {
+                //print $this->name.PHP_EOL;
                 return $this->event->send(null);
             }
             return $this->event->send($this->getPending(True));
