@@ -60,12 +60,16 @@ class httpRequest extends coStreamSocket {
     }
     
     function bootstrapRequest() {
-        $readEvent  = $this->task->super['conn']->readEvent($this->task, null);
+        /*$readEvent  = $this->task->super['conn']->readEvent($this->task, null);
         $writeEvent = $this->task->super['conn']->writeEvent($this->task, null);
         $watchEvent = $this->task->super['conn']->watchEvent($this->task, null);
         $this->task->addEvent((new event($this->task, $readEvent)), 'readEvent');
         $this->task->addEvent((new event($this->task, $writeEvent)), 'writeEvent');
-        $this->task->addEvent((new event($this->task, $watchEvent)), 'watchEvent');
+        $this->task->addEvent((new event($this->task, $watchEvent)), 'watchEvent');*/
+        
+        
+        $ioEvent = $this->task->super['conn']->ioEvent($this->task, null);
+        $this->task->addEvent((new event($this->task, $ioEvent)), 'readEvent');
         
         $this->task->addEvent( //read te request
             (new event($this->task, $this->readRequest($this->task, null)))

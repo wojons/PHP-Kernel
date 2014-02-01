@@ -39,7 +39,8 @@ $kernel->addTask(array('name' => 'httpServer', 'priority' => 1), function(&$that
             
             //var_dump($that->super['conn']->bodySent());
             //var_dump($that->super['conn']->pendingBody);
-            //var_dump($that->super['conn']->getWriteBufferSize());
+            //print "before ending it all";
+            //var_dump($that->super['conn']->isWriteBufferEmpty());
             if($that->super['conn']->bodySent() == True && empty($that->super['conn']->pendingBody) && $that->super['conn']->isWriteBufferEmpty()) {
 
                 fclose($that->super['conn']->getStream());

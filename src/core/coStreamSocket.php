@@ -101,9 +101,57 @@ class coStreamSocket {
         }
     }
     
-    private function doRead() {
-        $availReadBuffer = $this->availReadBuffer();
+    function ioEvent($that, $data) {
+        yield;
+        $stream =& $this->task->super['conn'];
+        $fd     =& $stream->getFD();
+        $task   =& $this->task;
+        $none    = array();
+        
+        while(True) {
+            
+            $rSockets = array($this->stream);
+            $wSockets = array($this->stream);
+            
+            if ($select_count = stream_select($rSockets, $wSockets, $none, 0) > 0) {
+            
+                $availReadBuffer = $this->availReadBuffer();
+                
+                if(!empty($rSockets) && ($availReadBuffer == True || $availReadBuffer > 0)) {
+                //if( ($availReadBuffer == True || $availReadBuffer > 0)) {
+                    $read = $this->doRead($availReadBuffer);
+                    if($read === False) {
+                        exit();
+                    }
+                }
+                
+                if(!empty($wSockets) && !empty($this->write_buffer)) {
+                    $written = @fwrite($stream->stream, $this->write_buffer);
+
+                    if($written == False) {
+                        $this->isClientAlive = False;
+                        $task->setFinshed(True);
+                        print "failed write".PHP_EOL;
+                        break;
+                    }
+                    elseif($written < strlen($this->write_buffer)) {
+                        $this->write_buffer = substr($this->write_buffer, $written);
+                    } else {
+                        $this->write_buffer = "";
+                    }
+                    
+                }
+            } else {
+                
+            }
+            yield;
+        }
+    }
+    
+    private function doRead($availReadBuffer=null) {
+        $availReadBuffer = ($availReadBuffer==NULL) ? $this->availReadBuffer() : $availReadBuffer;
         $read = fread($this->stream, ((is_int($availReadBuffer)) ? $availReadBuffer : $this->default_read_buffer));
+        
         if($read !== False) {
             $this->read_buffer .= $read;
             return $read;
@@ -157,7 +205,7 @@ class coStreamSocket {
     }
     
     function isWriteBufferEmpty() {
-        return !empty($this->write_buffer);
+        return empty($this->write_buffer);
     }
     
     function isClientAlive() {

@@ -45,9 +45,9 @@ class scheduler {
                     if(empty($dat)) { unset($this->pending_select[$dex]); }
                 }
             }*/
-            if(!empty($this->watch_stream['read']) || !empty($this->watch_stream['write'])) {
+            /*if(!empty($this->watch_stream['read']) || !empty($this->watch_stream['write'])) {
                 $this->checkStream(0);
-            }
+            }*/
             
             //print_r(array('ptid' => $this->task_ptid));
             if(!empty($this->total_tasks) || $this->__rebuildTaskTotal()) {
