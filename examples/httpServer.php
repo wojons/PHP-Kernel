@@ -7,7 +7,7 @@ require_once('../src/server/httpServer.php');
 $kernel = new scheduler();
 $kernel->addTask(array('name' => 'httpServer', 'priority' => 1), function(&$that) {
     if(!isset($that->super['server'])) {
-        $that->super['server'] = new coStreamSocketServer('tcp://0.0.0.0:9191');
+        $that->super['server'] = new coStreamSocketServer('tcp://0.0.0.0:9090');
         $that->super['count']  = 0;
         $that->super['anySubTasksExists'] = Null;
         $any_sub_tasks = function(&$that, $data) {

@@ -41,70 +41,15 @@ class coStreamSocket {
         if($this->read_buffer_max == -1) {
             return True;
         }
-        elseif(strlen($buff_size = $this->read_buffer) < $this->read_buffer_max) {
-            return $this->read_buffer_max - strlen($buff_size);
+        elseif($buff_size = (strlen($this->read_buffer) < $this->read_buffer_max)) {
+            return $this->read_buffer_max - $buff_size;
         }
         return False;
     }
     
-    function readEvent(&$that, $data) {
-        yield;
-        $stream =& $this->task->super['conn'];
-        $fd     =& $stream->getFD();
-        $task   =& $this->task;
-        $none   = array();
-        //$readS  = array($fd, $stream->stream);
-        
-        while(True) {
-            $availReadBuffer = $stream->availReadBuffer();
-            
-            if(isset($task->pending_fd[$fd]['read']) && $task->pending_fd[$fd]['read'] == True && ($availReadBuffer == True || $availReadBuffer > 0)) {
-            //if( ($availReadBuffer == True || $availReadBuffer > 0)) {
-                $read = $this->doRead();
-                if($read === False) {
-                    exit();
-                }
-                unset($task->pending_fd[$fd]['read']);
-            }
-            
-            yield;
-        }
-    }
-    
-    function watchEvent($that, $data) {
-        yield;
-        $stream  =& $this->task->super['conn'];
-        $fd      =& $stream->getFD();
-        $task    =& $this->task;
-        $none    = array();
-        $sockets = array($fd, $stream->stream);
-        while(true) {
-            $task->setRetval((new systemCall(function($task, $scheduler) use ($sockets, $none){
-                $scheduler->addStream2Watch($sockets, $sockets, $none);
-            })));
-            $task->setRetval(new systemCall(function($task, $scheduler) use ($fd){
-                if($pending = $scheduler->isPendingSelect($fd)) {
-                    if(isset($pending['read'])) {
-                        $task->pending_fd[$fd]['read'] = True;
-                    }
-                    if(isset($pending['write'])) {
-                        $task->pending_fd[$fd]['write'] = True;
-                    }
-                    if(isset($pending['error'])) {
-                        $task->pending_fd[$fd]['error'] = True;
-                    }
-                    $scheduler->delPendingSelect($fd);
-                }
-            }));
-            
-            yield;
-        }
-    }
-    
     function ioEvent($that, $data) {
         yield;
-        $stream =& $this->task->super['conn'];
-        $fd     =& $stream->getFD();
+        //$fd     =& $stream->getFD();
         $task   =& $this->task;
         $none    = array();
         
@@ -118,7 +63,6 @@ class coStreamSocket {
                 $availReadBuffer = $this->availReadBuffer();
                 
                 if(!empty($rSockets) && ($availReadBuffer == True || $availReadBuffer > 0)) {
-                //if( ($availReadBuffer == True || $availReadBuffer > 0)) {
                     $read = $this->doRead($availReadBuffer);
                     if($read === False) {
                         exit();
@@ -126,23 +70,16 @@ class coStreamSocket {
                 }
                 
                 if(!empty($wSockets) && !empty($this->write_buffer)) {
-                    $written = @fwrite($stream->stream, $this->write_buffer);
-
-                    if($written == False) {
+                    
+                    if(($written = @fwrite($this->stream, $this->write_buffer)) > 0) {
+                        $this->write_buffer = substr($this->write_buffer, $written);
+                    } else {
                         $this->isClientAlive = False;
                         $task->setFinshed(True);
                         print "failed write".PHP_EOL;
                         break;
                     }
-                    elseif($written < strlen($this->write_buffer)) {
-                        $this->write_buffer = substr($this->write_buffer, $written);
-                    } else {
-                        $this->write_buffer = "";
-                    }
-                    
                 }
-            } else {
-                
             }
             yield;
         }
@@ -157,42 +94,6 @@ class coStreamSocket {
             return $read;
         }
         return False;
-    }
-    
-    function writeEvent(&$that, $data) {
-        yield;
-        $stream =& $this->task->super['conn'];
-        $fd     =& $stream->getFD();
-        $task   =& $this->task;
-        $none   = array();
-        //$writeS = array($fd, $stream->getStream());
-        
-        while(True) {
-            //print "write loop".PHP_EOL;
-            if(isset($task->pending_fd[$fd]['write']) && $task->pending_fd[$fd]['write'] == True && !empty($this->write_buffer)) {
-            //if( !empty($this->write_buffer)) {
-                
-                $written = @fwrite($stream->stream, $this->write_buffer);
-                //var_dump($written);
-                if($written == False) {
-                    $this->isClientAlive = False;
-                    $task->setFinshed(True);
-                    print "failed write".PHP_EOL;
-                    break;
-                }
-                elseif($written < strlen($this->write_buffer)) {
-                    $this->write_buffer = substr($this->write_buffer, $written);
-                } else {
-                    $this->write_buffer = "";
-                }
-                
-                unset($task->pending_fd[$fd]['write']);
-            } else {
-                //var_dump($this->doRead());
-            }
-
-            yield;
-        }
     }
     
     function bufferWrite($write) {
